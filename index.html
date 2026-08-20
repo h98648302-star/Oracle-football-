@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071522">
+<title>ORACLE FOOTBALL RÉEL — V1000 MULTI-SOURCES</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#06121e;color:#f5f8fb;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:16px;background:#071522;border-bottom:1px solid #29465c;position:sticky;top:0;z-index:5}
+main{max-width:760px;margin:auto;padding:12px 14px 45px}.card{background:#0d1e2d;border:1px solid #29465c;border-radius:17px;padding:15px;margin:12px 0}
+h1{font-size:21px;margin:0}.sub{color:#aab9c5;font-size:14px;margin-top:4px}
+label{display:block;font-weight:700;margin:10px 0 5px}input,button{width:100%;padding:13px;border-radius:12px;font:inherit;border:1px solid #36556b;background:#071622;color:#fff}
+button{background:#54d3c5;color:#06121e;border:0;font-weight:800;margin-top:12px}.ghost{background:#173047;color:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pill{display:inline-block;background:#173047;padding:6px 9px;border-radius:999px;margin:3px;font-size:12px}
+.kpi{font-size:25px;font-weight:900}.muted{color:#aab9c5}.ok{color:#7fe3a4}.warn{color:#ffd27a}.bad{color:#ff8f8f}
+.result{padding:12px;border-radius:13px;background:#091827;margin-top:9px}.bar{height:8px;background:#1b3346;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:#54d3c5}
+.small{font-size:12px}.source{padding:9px 0;border-bottom:1px solid #20394d}.source:last-child{border-bottom:0}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔮 ORACLE FOOTBALL RÉEL — V1000</h1>
+  <div class="sub">Recherche multi-sources → vérification du match → analyse → verdict</div>
+</header>
+<main>
+<section class="card">
+  <b>1. Tes matchs</b>
+  <div class="grid">
+    <input id="a1" placeholder="Équipe 1 — Match 1">
+    <input id="b1" placeholder="Équipe 2 — Match 1">
+    <input id="a2" placeholder="Équipe 1 — Match 2 (optionnel)">
+    <input id="b2" placeholder="Équipe 2 — Match 2 (optionnel)">
+    <input id="a3" placeholder="Équipe 1 — Match 3 (optionnel)">
+    <input id="b3" placeholder="Équipe 2 — Match 3 (optionnel)">
+  </div>
+  <button id="go">🔎 ANALYSER AUTOMATIQUEMENT</button>
+  <button class="ghost" id="clear">Effacer</button>
+</section>
+
+<section class="card">
+  <b>2. État des sources</b>
+  <div id="sources" class="muted">Aucune recherche lancée.</div>
+</section>
+
+<section id="out" class="card" style="display:none">
+  <b>3. Résultats</b>
+  <div id="results"></div>
+</section>
+
+<section class="card">
+  <b>⚠️ Ce que cette version garantit</b>
+  <p class="muted small">
+  L'interface ne fabrique pas de statistiques ou de cotes lorsqu'une source ne les fournit pas.
+  Les probabilités sont présentées comme probabilités statistiques, jamais comme certitudes à 99–100 %.
+  </p>
+</section>
+</main>
+<script>
+async function analyze(a,b){
+  const r=await fetch('/api/analyze',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({home:a,away:b})
+  });
+  if(!r.ok) throw new Error((await r.text())||'Erreur serveur');
+  return r.json();
+}
+function card(d){
+  const p=d.prediction||{};
+  const probs=p.probabilities||{};
+  return `<div class="result">
+    <div><b>${d.match?.home||''}</b> vs <b>${d.match?.away||''}</b></div>
+    <div class="small muted">${d.match?.dateCI||'Date non confirmée'} · ${d.match?.competition||'Compétition non confirmée'}</div>
+    <div class="small">${d.match?.venue||'Stade non confirmé'} · ${d.match?.city||'Ville non confirmée'}</div>
+    <hr style="border-color:#20394d;border-width:1px 0 0">
+    <div class="kpi">${p.winner||'Pas de verdict'}</div>
+    <div>Score statistique : <b>${p.score||'non disponible'}</b></div>
+    <div>Total buts : <b>${p.totalGoals||'non disponible'}</b></div>
+    <div class="small">Confiance : ${p.confidence??'—'}%</div>
+    <div class="bar"><i style="width:${Math.max(0,Math.min(100,Number(p.confidence)||0))}%"></i></div>
+    <p class="small muted">${p.note||''}</p>
+    <div class="small"><b>Sources consultées :</b> ${(d.sources||[]).map(s=>`<span class="pill">${s}</span>`).join('')}</div>
+  </div>`;
+}
+document.getElementById('go').onclick=async()=>{
+  const pairs=[[a1.value,b1.value],[a2.value,b2.value],[a3.value,b3.value]].filter(x=>x[0]&&x[1]);
+  if(!pairs.length){alert('Entre au moins un match.');return}
+  out.style.display='block'; results.innerHTML='<div class="muted">Recherche en cours…</div>';
+  sources.innerHTML='<span class="warn">⏳ Identification du match et consultation des sources…</span>';
+  try{
+    const data=[];
+    for(const [a,b] of pairs) data.push(await analyze(a,b));
+    sources.innerHTML='<span class="ok">✓ Recherche terminée. Les données disponibles ont été croisées.</span>';
+    results.innerHTML=data.map(card).join('');
+  }catch(e){
+    sources.innerHTML='<span class="bad">✗ '+e.message+'</span>';
+    results.innerHTML='';
+  }
+};
+clear.onclick=()=>location.reload();
+</script>
+</body>
+</html>
